@@ -1,14 +1,15 @@
-require 'microkube/renderer'
+require 'opendax/renderer'
 
-describe Microkube::Renderer do
-  let(:renderer) { Microkube::Renderer.new }
+describe Opendax::Renderer do
+  let(:renderer) { Opendax::Renderer.new }
   let(:fake_erb_result) { { 'data' => 'this is fake data'} }
   let(:config) do
     {
       'app' => {
-        'name' => 'Microkube',
+        'name' => 'Opendax',
         'domain' => 'app.test'
       },
+      'render_protect' => false,
       'ssl' => {
         'enabled' => 'true',
         'email' => 'support@example.com'
@@ -61,7 +62,6 @@ describe Microkube::Renderer do
 
   describe '.render_file' do
     it 'should render file' do
-      expect(renderer).to receive(:config).once
       expect(ERB).to receive(:new).once.and_call_original
       expect_any_instance_of(ERB).to receive(:result).once.and_return(fake_erb_result)
       expect(File).to receive(:write).with('./config/peatio.env', fake_erb_result).once.and_call_original
@@ -82,18 +82,14 @@ describe Microkube::Renderer do
     end
   end
 
-  let(:renderer) { Microkube::Renderer.new }
+  let(:renderer) { Opendax::Renderer.new }
 
   describe '.render' do
     it 'should call exact amount of helper functions' do
-      number_of_files = Dir.glob('./templates/**/*.erb').length
-
-      expect(renderer).to receive(:render_keys).once
+      number_of_files = Dir.glob('./templates/**/*.erb', File::FNM_DOTMATCH).length
       expect(renderer).to receive(:render_file).exactly(number_of_files).times
-      expect(renderer).to receive(:template_name).exactly(number_of_files).times
 
       renderer.render
-      renderer.render_keys
     end
   end
 end

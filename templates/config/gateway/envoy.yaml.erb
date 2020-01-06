@@ -16,6 +16,16 @@ static_resources:
             - name: backend
               domains:
               - "*"
+              cors:
+                allow_origin:
+                - "<%= ssl_helper('http') %>://<%= @config['app']['subdomain'] %>.<%= @config['app']['domain'] %>"
+                allow_methods: "PUT, GET, POST"
+                allow_headers: "content-type, x-grpc-web"
+                filter_enabled:
+                  default_value:
+                    numerator: 100
+                    denominator: HUNDRED
+                  runtime_key: cors.www.enabled
               routes:
               - match:
                   prefix: "/api/v2/barong"
@@ -26,6 +36,11 @@ static_resources:
                   prefix: "/api/v2/applogic"
                 route:
                   cluster: applogic
+                  prefix_rewrite: "/api/v2/"
+              - match:
+                  prefix: "/api/v2/arke"
+                route:
+                  cluster: arke
                   prefix_rewrite: "/api/v2/"
               - match:
                   prefix: "/api/v2/peatio"
@@ -55,6 +70,8 @@ static_resources:
                   upgrade_configs:
                     upgrade_type: "websocket"
           http_filters:
+          - name: envoy.cors
+            typed_config: {}
           - name: envoy.ext_authz
             config:
               with_request_body:
@@ -108,6 +125,14 @@ static_resources:
     hosts:
     - socket_address:
         address: applogic
+        port_value: 8081
+  - name: arke
+    connect_timeout: 0.25s
+    type: strict_dns
+    lb_policy: round_robin
+    hosts:
+    - socket_address:
+        address: arke
         port_value: 8081
   - name: peatio
     connect_timeout: 0.25s

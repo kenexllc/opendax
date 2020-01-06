@@ -3,7 +3,7 @@
 COMPOSE_VERSION="1.23.2"
 COMPOSE_URL="https://github.com/docker/compose/releases/download/$COMPOSE_VERSION/docker-compose-$(uname -s)-$(uname -m)"
 
-install_microkube() {
+install_opendax() {
   sudo -u app bash <<EOS
   cd /home/app
   source /home/app/.rvm/scripts/rvm
@@ -12,14 +12,14 @@ install_microkube() {
   gem install bundler
 
 
-  cd microkube
+  cd opendax
 
   bundle install
   rake render:config
-  rake geth:import && \
-  until rake wallet:create['deposit','http://0.0.0.0:8545','changeme']; do sleep 15; done && \
-  rake wallet:create['hot','http://0.0.0.0:8545','changeme'] && \
-  rake wallet:create['warm','http://0.0.0.0:8545','changeme'] && \
+  rake service:cryptonodes && \
+  until rake wallet:create['deposit','http://127.0.0.1:8545','changeme']; do sleep 15; done && \
+  rake wallet:create['hot','http://127.0.0.1:8545','changeme'] && \
+  rake wallet:create['warm','http://127.0.0.1:8545','changeme'] && \
   rake render:config && \
   rake service:all && \
   rake service:daemons && \
@@ -28,4 +28,4 @@ install_microkube() {
 EOS
 }
 
-install_microkube
+install_opendax

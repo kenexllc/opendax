@@ -39,11 +39,13 @@ namespace :service do
 
     def start
       puts '----- Starting dependencies -----'
+      puts "----- Vault mode: #{@config['vault']['mode']} -----"
       sh 'docker-compose up -d vault db redis rabbitmq'
       sh 'docker-compose run --rm vault secrets enable totp \
               && docker-compose run --rm vault secrets disable secret \
+              && docker-compose run --rm vault secrets enable transit \
               && docker-compose run --rm vault secrets enable -path=secret -version=1 kv \
-              || echo Vault already enabled'
+              || echo Vault already enabled' if @config['vault']['mode'] == 'development'
       sleep 7 # time for db to start, we can get connection refused without sleeping
     end
 
@@ -56,20 +58,55 @@ namespace :service do
     @switch.call(args, method(:start), method(:stop))
   end
 
-  desc '[Optional] Run arke'
-  task :arke, [:command] do |task, args|
+  desc 'Run influxdb'
+  task :influxdb, [:command] do |task, args|
+    args.with_defaults(:command => 'start')
+
+    def start
+      puts '----- Starting influxdb -----'
+      sh 'docker-compose up -d influxdb'
+      sh 'docker-compose exec influxdb bash -c "cat influxdb.sql | influx"'
+    end
+
+    def stop
+      puts '----- Stopping influxdb -----'
+      sh 'docker-compose rm -fs influxdb'
+    end
+
+    @switch.call(args, method(:start), method(:stop))
+  end
+
+  desc '[Optional] Run arke-maker'
+  task :arke_maker, [:command] do |task, args|
     args.with_defaults(:command => 'start')
 
     def start
       puts '----- Starting arke -----'
-      sh 'docker-compose up -d arke'
+      sh 'docker-compose up -d arke-maker'
     end
 
     def stop
       puts '----- Stopping arke -----'
-      sh 'docker-compose rm -fs arke'
+      sh 'docker-compose rm -fs arke-maker'
     end
 
+    @switch.call(args, method(:start), method(:stop))
+  end
+
+  desc '[Optional] Run arke proxy'
+  task :arke_proxy, [:command] do |task, args|
+    @containers = %w[arke arke-etl]
+    args.with_defaults(:command => 'start')
+
+    def start
+      puts '----- Starting arke-proxy -----'
+      sh "docker-compose up -d #{@containers.join(' ')}"
+    end
+
+    def stop
+      puts '----- Stopping arke-proxy -----'
+      sh "docker-compose rm -fs #{@containers.join(' ')}"
+    end
 
     @switch.call(args, method(:start), method(:stop))
   end
@@ -99,12 +136,12 @@ namespace :service do
 
     def start
       puts '----- Starting cryptonodes -----'
-      sh 'docker-compose up -d geth'
+      sh 'docker-compose up -d parity'
     end
 
     def stop
       puts '----- Stopping cryptonodes -----'
-      sh 'docker-compose rm -fs geth'
+      sh 'docker-compose rm -fs parity'
     end
 
     @switch.call(args, method(:start), method(:stop))
@@ -112,11 +149,13 @@ namespace :service do
 
   desc 'Run setup hooks for peatio, barong'
   task :setup, [:command] do |task, args|
-    puts '----- Running hooks -----'
-    sh 'docker-compose run --rm peatio bash -c "./bin/link_config && bundle exec rake db:create db:migrate"'
-    sh 'docker-compose run --rm peatio bash -c "./bin/link_config && bundle exec rake db:seed"'
-    sh 'docker-compose run --rm barong bash -c "./bin/init_config && bundle exec rake db:create db:migrate"'
-    sh 'docker-compose run --rm barong bash -c "./bin/link_config && bundle exec rake db:seed"'
+    if args.command != 'stop'
+      puts '----- Running hooks -----'
+      sh 'docker-compose run --rm peatio bash -c "./bin/link_config && bundle exec rake db:create db:migrate"'
+      sh 'docker-compose run --rm peatio bash -c "./bin/link_config && bundle exec rake db:seed"'
+      sh 'docker-compose run --rm barong bash -c "./bin/init_config && bundle exec rake db:create db:migrate"'
+      sh 'docker-compose run --rm barong bash -c "./bin/link_config && bundle exec rake db:seed"'
+    end
   end
 
   desc 'Run mikro app (barong, peatio)'
@@ -235,6 +274,8 @@ namespace :service do
       Rake::Task["service:app"].invoke('start')
       Rake::Task["service:frontend"].invoke('start')
       Rake::Task["service:tower"].invoke('start')
+      Rake::Task["service:influxdb"].invoke('start') if @config['arke_proxy']['enabled']
+      Rake::Task["service:arke_proxy"].invoke('start') if @config['arke_proxy']['enabled']
       Rake::Task["service:utils"].invoke('start')
       Rake::Task["service:daemons"].invoke('start')
     end
@@ -246,6 +287,8 @@ namespace :service do
       Rake::Task["service:app"].invoke('stop')
       Rake::Task["service:frontend"].invoke('stop')
       Rake::Task["service:tower"].invoke('stop')
+      Rake::Task["service:influxdb"].invoke('stop')
+      Rake::Task["service:arke_proxy"].invoke('stop')
       Rake::Task["service:utils"].invoke('stop')
       Rake::Task["service:daemons"].invoke('stop')
     end
