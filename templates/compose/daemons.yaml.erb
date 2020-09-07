@@ -17,25 +17,17 @@ services:
     << : *peatio-daemon
     command: bash -c "bin/link_config && bundle exec ruby lib/daemons/daemons.rb blockchain"
 
-  global_state:
+  cron_job:
     << : *peatio-daemon
-    command: bash -c "bin/link_config && bundle exec ruby lib/daemons/daemons.rb global_state"
+    command: bash -c "bin/link_config && bundle exec ruby lib/daemons/daemons.rb cron_job"
 
-  k:
+  deposit:
     << : *peatio-daemon
-    command: bash -c "bin/link_config && bundle exec ruby lib/daemons/daemons.rb k"
+    command: bash -c "bin/link_config && bundle exec ruby lib/daemons/daemons.rb deposit"
 
-  slave_book:
+  upstream:
     << : *peatio-daemon
-    command: bash -c "bin/link_config && bundle exec ruby lib/daemons/daemons.rb slave_book"
-
-  deposit_collection:
-    << : *peatio-daemon
-    command: bash -c "bin/link_config && bundle exec ruby lib/daemons/amqp_daemon.rb deposit_collection"
-
-  deposit_collection_fees:
-    << : *peatio-daemon
-    command: bash -c "bin/link_config && bundle exec ruby lib/daemons/amqp_daemon.rb deposit_collection_fees"
+    command: bash -c "bin/link_config && bundle exec ruby lib/daemons/daemons.rb upstream"
 
   deposit_coin_address:
     << : *peatio-daemon
@@ -45,6 +37,21 @@ services:
     << : *peatio-daemon
     command: bash -c "bin/link_config && bundle exec ruby lib/daemons/amqp_daemon.rb market_ticker"
 
+  withdraw_coin:
+    << : *peatio-daemon
+    command: bash -c "bin/link_config && bundle exec ruby lib/daemons/amqp_daemon.rb withdraw_coin"
+
+  influx_writer:
+    << : *peatio-daemon
+    command: bash -c "bin/link_config && bundle exec ruby lib/daemons/amqp_daemon.rb influx_writer"
+
+  rango:
+    restart: always
+    image: "<%= @config['images']['rango'] %>"
+    env_file:
+      - ../config/rango.env
+
+<% unless @config['finex']['enabled'] %>
   matching:
     << : *peatio-daemon
     command: bash -c "bin/link_config && bundle exec ruby lib/daemons/amqp_daemon.rb matching"
@@ -56,34 +63,18 @@ services:
   trade_executor:
     << : *peatio-daemon
     command: bash -c "bin/link_config && bundle exec ruby lib/daemons/amqp_daemon.rb trade_executor"
+<% end %>
 
-  withdraw_coin:
-    << : *peatio-daemon
-    command: bash -c "bin/link_config && bundle exec ruby lib/daemons/amqp_daemon.rb withdraw_coin"
-
-  pusher_market:
-    << : *peatio-daemon
-    command: bash -c "bin/link_config && bundle exec ruby lib/daemons/amqp_daemon.rb pusher_market"
-
-  pusher_member:
-    << : *peatio-daemon
-    command: bash -c "bin/link_config && bundle exec ruby lib/daemons/amqp_daemon.rb pusher_member"
-
-  ranger:
+  mailer:
     restart: always
-    image: "<%= @config['images']['peatio'] %>"
+    image: "<%= @config['images']['barong'] %>"
     env_file:
-      - ../config/ranger.env
-    command: bash -c "bundle exec peatio service start ranger"
-
-  postmaster:
-    restart: always
-    image: "<%= @config['images']['postmaster'] %>"
-    env_file:
-      - ../config/postmaster.env
+      - ../config/barong.env
     volumes:
-      -  ../config/postmaster.yml:/app/config/postmaster.yml
-      - ../config/postmaster/templates:/app/templates
+      -  ../config/secrets:/secrets:ro
+      -  ../config/mailer/templates:/home/app/app/views/postmaster
+      -  ../config/mailer.yml:/home/app/config/mailer.yml
+    command: bash -c "bin/mailer run"
 
   sidekiq:
     restart: always

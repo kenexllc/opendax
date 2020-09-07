@@ -70,12 +70,34 @@ Insert in file `/etc/hosts`
 0.0.0.0 www.app.local
 ```
 
-#### 4.2 Bring everything up
+#### 4.2 Render all config files
+
+Simply run `rake render:config`
+
+#### 4.3 Set up Vault
+
+    Note: Everything is persisted on the local filesystem, thus API keys and 2FA tokens are preserved between restarts. However, Vault needs to be unsealed after every stop/restart.
+
+To set up Vault, go through the following steps:
+  - `docker-compose up -d vault`
+  - `docker-compose exec vault sh`
+  - `vault operator init`
+  - Save the output to a file in a secure place
+  - Unlock Vault with three different unlock keys - `vault operator unseal *unseal_key*`
+  - `vault login *root_token*`
+  - `vault secrets enable totp`
+  - `vault secrets enable transit`
+  - `vault secrets disable secret`
+  - `vault secrets enable -path=secret -version=1 kv`
+
+Add the Vault root token to `config/app.yml`, render the configs and start the `app` services.
+Afterwards, Vault should be fully configured and ready to work with Peatio and Barong.
+
+#### 4.4 Bring everything up
 
 ```bash
 rake service:all
 ```
-
 
 You can login on `www.app.local` with the following default users from seeds.yaml
 ```
@@ -90,19 +112,53 @@ Email: john@barong.io, password: Am8icnzEI3d!
 
 All the OpenDAX deployment files have their confguration stored in `config/app.yml`.
 
-Feel free to fill it out with correct values:
+#### app.yml
 
-| Parameter         | Description                                      |
-| ----------------- | ------------------------------------------------ |
-| `app.name`        | Global application name                          |
-| `app.domain`      | Base domain name to be used                      |
-| `ssl.enabled`     | Enable SSL certificate generation                |
-| `ssl.email`       | Email address to use for SSL generation requests |
-| `images`          | Application images tags                          |
-| `vendor`          | Frontend application Git repo URL                |
-| `render_protect`  | Enable read-only mode for rendered files         |
+The following table lists the configurable parameters of the config/app.yml configuration file and its default values.
 
-    Note: You can protect all the rendered files from being edited so that you wouldn't lose your changes upon re-rendering templates in the future by setting `render_protect` to `true` 
+Parameter | Description | Default
+--- | --- | ---
+`app.name` | global application name | `"OpenDax"`
+`app.domain` | base domain name | `app.local`
+`subdomain` | subdomain | `www`
+`render_protect` | enable read-only mode for rendered files | `false`
+`csrfEnabled` | enable CSRF protection on Barong | `false`
+`ssl.enabled` | enable SSL certificate generation | `false`
+`ssl.email` | email address used for SSL certificate issuing | `"support@example.com"`
+`images` | Docker image tags per component
+`vendor.frontend` | optional Git URL for a development frontend repo | `git@github.com:openware/baseapp.git`
+`vault.token` | Vault authentication token | `changeme `
+`database.host` | database host name | `db`
+`database.port` | database port | `3306 `
+`database.user` | database username | `root`
+`database.password` | database root password | `changeme`
+`storage.provider` | object storage provider | `"Google"`
+`storage.bucketname` | storage bucket name | `"opendax-barong-docs-bucket"`
+`storage.endpoint` | S3-compatible storage API endpoint | `"https://fra1.digitaloceanspaces.com"`
+`storage.region` | storage region | `"fra1"`
+`storage.signatureVersion` | S3-compatible storage API signature version(2 or 4) | `"fra1"`
+`storage.secretkey`, `storage.accesskey` | storage access keys | `"changeme"`
+`twilio` | [Twilio](https://www.twilio.com/) SMS provider configs
+`gaTrackerKey` | [Google Analytics](https://analytics.google.com/) tracker key inserted into the frontend app
+`smtp` | SMTP configs used for sending platform emails 
+`captcha` | captcha configuration([Recaptcha](https://www.google.com/recaptcha) or [Geetest](https://www.geetest.com))
+`wallets` | configs for wallets seeded during the initial deployment of Peatio 
+`parity` | Parity cryptonode configuration
+`bitcoind` | Bitcoind cryptonode configuration
+`litecoind` | Litecoind cryptonode configuration
+`terraform.credentials` | local path to a GCP service account JSON key | `"~/safe/opendax.json"`
+`terraform.project` | GCP project name | `"example-opendax"`
+
+### utils.yml
+
+The following table lists configurable parameters of the `config/utils.yml` file:
+
+Parameter | Description | Default
+--- | --- | ---
+images | Docker image tags per component |
+superset | Superset BI tool configs |
+arke | Arke liquidity bot configs |
+
 Once you're done with the configuration, render the files using `rake render:config`. You can easily apply your changes at any time by running this command.
 
     Note: be sure to append all the subdomains based on app.domain to your
@@ -125,6 +181,7 @@ The components included in the stack are:
 - `app` - [Peatio](https://github.com/rubykube/peatio), [Barong](https://github.com/rubykube/barong) and the [Ambassador](https://www.getambassador.io) API gateway
 - `frontend` - the frontend application located at `vendor/frontend`
 - `tower` - the Tower admin panel application located at `vendor/tower`
+- `monitoring` - [cAdvisor](https://github.com/google/cadvisor) and [Node Exporter](https://github.com/prometheus/node_exporter) monitoring tools **[Optional]**
 
 For example, to start the `backend` services, you'll simply need to run `rake service:backend[start]`
 
@@ -132,30 +189,6 @@ For example, to start the `backend` services, you'll simply need to run `rake se
     rake service:*component*[start] explicitly
 
 Go ahead and try your own OpenDAX exchange deployment!
-
-### Vault setup
-
-You can run Vault in two modes: `development` and `production`. You can set it in the `vault.mode` field of `app.yml`.
-The main differences are:
- - Development mode
-   Everything is stored in memory, thus all API keys and 2FA tokens are lost on every container restart.
- - Production mode
-   Everything is persisted on the local filesystem, thus API keys and 2FA tokens are preserved between restarts. However, Vault needs to be unsealed after every stop/restart.
-
-To setup Vault in production mode, go through the following steps:
-  - `docker-compose exec vault sh`
-  - `vault operator init`
-  - Save the output to a file in a secure place
-  - Unlock Vault with three different unlock keys - `vault operator unseal *unseal_key*`
-  - `vault login *root_token*`
-  - `vault secrets enable totp`
-  - `vault secrets disable secret`
-  - `vault secrets enable -path=secret -version=1 kv`
-
-Add the Vault root token to `config/app.yml`, render the configs and start the `app` services.
-Afterwards, Vault should be fully configured and ready to work with Peatio and Barong.
-
-For development mode Vault setup you don't have to perform any actions.
 
 ### Stopping and restarting components
 
@@ -175,7 +208,7 @@ These files get rendered from their respective templates that are located under 
 
 ## How to update component image?
 
-Modify `config/app.yml` with correct image and run `rake service:all
+Modify `config/app.yml` with correct image and run `rake service:all`
 This will rerender all the files from `templates` directory and restart all the running services.
 
 Alternitavely you can update the following files:

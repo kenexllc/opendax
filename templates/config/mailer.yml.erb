@@ -1,9 +1,3 @@
-languages:
-- code: EN
-  name: English
-- code: RU
-  name: Russian
-
 keychain:
   barong:
     algorithm: RS256
@@ -30,10 +24,10 @@ events:
   templates:
     EN:
       subject: Registration Confirmation
-      template_path: templates/en/email_confirmation.tpl
+      template_path: email_confirmation.en.html.erb
     RU:
       subject: Подтверждение Регистрации
-      template_path: templates/ru/email_confirmation.tpl
+      template_path: email_confirmation.ru.html.erb
 
 - name: Password Reset
   key: user.password.reset.token
@@ -41,10 +35,10 @@ events:
   templates:
     EN:
       subject: Password Reset
-      template_path: templates/en/password_reset.tpl
+      template_path: password_reset.en.html.erb
     RU:
       subject: Сброс Пароля
-      template_path: templates/ru/password_reset.tpl
+      template_path: password_reset.ru.html.erb
 
 - name: Label Created
   key: label.created
@@ -55,7 +49,7 @@ events:
   templates:
     EN:
       subject: Account Details Updated
-      template_path: templates/en/label_created.tpl
+      template_path: label_created.en.html.erb
 
 - name: Label Updated
   key: label.updated
@@ -66,7 +60,7 @@ events:
   templates:
     EN:
       subject: Account Details Updated
-      template_path: templates/en/label_created.tpl
+      template_path: label_created.en.html.erb
 
 - name: Deposit Accepted
   key: deposit.updated
@@ -75,7 +69,7 @@ events:
   templates:
     EN:
       subject: Deposit Accepted
-      template_path: templates/en/deposit_accepted.tpl
+      template_path: deposit_accepted.en.html.erb
 
 - name: Session Create
   key: session.create
@@ -83,16 +77,16 @@ events:
   templates:
     EN:
       subject: New Login
-      template_path: templates/en/session_create.tpl
+      template_path: session_create.en.html.erb
 
 - name: Withdrawal Succeed
   key: withdraw.updated
   exchange: peatio
-  expression: changes.state in ["errored", "confirming"] && record.state == "succeed"
+  expression: changes.state in ["succeed", "rejected", "canceled", "failed", "accepted"] && record.state in ["succeed", "rejected", "canceled", "failed"]
   templates:
     EN:
       subject: Withdrawal Succeed
-      template_path: templates/en/withdraw_succeed.tpl
+      template_path: withdraw_succeed.en.html.erb
 
 - name: New Beneficiary
   key: beneficiary.created
@@ -100,4 +94,4 @@ events:
   templates:
     EN:
       subject: New Beneficiary
-      template_path: templates/en/new_beneficiary.tpl
+      template_path: new_beneficiary.en.html.erb
